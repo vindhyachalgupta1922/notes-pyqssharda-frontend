@@ -30,3 +30,12 @@ export const getContributors = async () => {
   const response = await api.get("/auth/contributors");
   return response.data;
 };
+
+// Search from all resourcesf
+export const searchFromAllResources = async (params: {
+  query: string;
+  type?: "all" | "notes" | "pyqs" | "syllabus";
+}) => {
+  const response = await api.get("/resources/search", { params });
+  return response.data;
+};

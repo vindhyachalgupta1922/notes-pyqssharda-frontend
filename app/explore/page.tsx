@@ -1,19 +1,63 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { useSearchStore } from "@/stores/search.store";
+import { SearchParams, ResourceType, SearchResult } from "@/lib/api/search.api";
 
 export default function ExplorePage() {
+  const router = useRouter();
+  const urlSearchParams = useSearchParams();
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<ResourceType>("all");
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [courseCode, setCourseCode] = useState("");
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Use search store
+  const { results, isLoading, error, searchResources, clearResults } =
+    useSearchStore();
+
+  // Load search params from URL on mount
+  useEffect(() => {
+    const query = urlSearchParams.get("q");
+    if (!query) return;
+
+    const type = urlSearchParams.get("type") as ResourceType | null;
+    const program = urlSearchParams.get("program");
+    const code = urlSearchParams.get("code");
+    const year = urlSearchParams.get("year");
+    const semester = urlSearchParams.get("semester");
+
+    // Set state from URL params
+    setSearchQuery(query);
+    if (type) setSelectedType(type);
+    if (program) setSelectedProgram(program);
+    if (code) setCourseCode(code);
+    if (year) setSelectedYear(year);
+    if (semester) setSelectedSemester(semester);
+
+    // Auto-trigger search if URL has params
+    const params: SearchParams = {
+      query,
+      type: type || "all",
+      ...(program && { program }),
+      ...(code && { courseCode: code }),
+      ...(year && { year }),
+      ...(semester && { semester }),
+    };
+
+    searchResources(params).then(() => {
+      setHasSearched(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearchParams]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -39,37 +83,89 @@ export default function ExplorePage() {
     type: "type" | "program" | "year" | "semester",
     value: string
   ) => {
-    if (type === "type") setSelectedType(value);
+    if (type === "type") setSelectedType(value.toLowerCase() as ResourceType);
     if (type === "program") setSelectedProgram(value);
     if (type === "year") setSelectedYear(value);
     if (type === "semester") setSelectedSemester(value);
     setActiveDropdown(null);
   };
 
-  const handleSearch = (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
-    if (
-      !searchQuery ||
-      !selectedType ||
-      !selectedProgram ||
-      !courseCode ||
-      !selectedYear ||
-      !selectedSemester
-    ) {
-      toast.error("Please fill all fields to search");
+    if (!searchQuery.trim()) {
+      toast.error("Please enter a search query");
       return;
     }
 
-    console.log("Searching with:", {
-      searchQuery,
-      selectedType,
-      selectedProgram,
-      courseCode,
-      selectedYear,
-      selectedSemester,
-    });
-    toast.success("Search submitted!");
+    const searchParams: SearchParams = {
+      query: searchQuery.trim(),
+      type: selectedType,
+      ...(selectedProgram && { program: selectedProgram }),
+      ...(courseCode && { courseCode: courseCode.toUpperCase() }),
+      ...(selectedYear && { year: selectedYear }),
+      ...(selectedSemester && { semester: selectedSemester }),
+    };
+
+    // Update URL search params
+    const urlParams = new URLSearchParams();
+    urlParams.set("q", searchParams.query);
+    if (searchParams.type && searchParams.type !== "all") {
+      urlParams.set("type", searchParams.type);
+    }
+    if (searchParams.program) {
+      urlParams.set("program", searchParams.program);
+    }
+    if (searchParams.courseCode) {
+      urlParams.set("code", searchParams.courseCode);
+    }
+    if (searchParams.year) {
+      urlParams.set("year", searchParams.year);
+    }
+    if (searchParams.semester) {
+      urlParams.set("semester", searchParams.semester);
+    }
+
+    // Update the browser URL without reloading
+    router.push(`?${urlParams.toString()}`, { scroll: false });
+
+    try {
+      await searchResources(searchParams);
+      setHasSearched(true);
+      toast.success("Search completed!");
+    } catch {
+      toast.error("Search failed. Please try again.");
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setSelectedType("all");
+    setSelectedProgram(null);
+    setCourseCode("");
+    setSelectedYear(null);
+    setSelectedSemester(null);
+    setHasSearched(false);
+    clearResults();
+
+    // Clear URL params
+    router.push(window.location.pathname, { scroll: false });
+  };
+
+  const getResourceTypeLabel = (result: SearchResult): string => {
+    // Determine resource type from the result object
+    if (result.noteType) return "Note";
+    if (result.pyqType) return "PYQ";
+    if (result.syllabusType) return "Syllabus";
+    return "Resource";
+  };
+
+  const getResourceTypeBadgeColor = (result: SearchResult): string => {
+    if (result.noteType) return "bg-blue-100 text-blue-700 border-blue-300";
+    if (result.pyqType) return "bg-red-100 text-red-700 border-red-300";
+    if (result.syllabusType)
+      return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    return "bg-gray-100 text-gray-700 border-gray-300";
   };
 
   const categories = [
@@ -187,22 +283,31 @@ export default function ExplorePage() {
                 type="button"
                 onClick={() => toggleDropdown("type")}
                 className={`flex items-center gap-2 px-4 py-1.5 bg-white rounded-full border ${
-                  selectedType
+                  selectedType !== "all"
                     ? "border-purple-400 bg-purple-50"
                     : "border-gray-200"
                 } text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors`}
               >
-                {selectedType || "Type"} <ChevronDownIcon className="w-4 h-4" />
+                {selectedType === "all"
+                  ? "All"
+                  : selectedType.charAt(0).toUpperCase() +
+                    selectedType.slice(1)}{" "}
+                <ChevronDownIcon className="w-4 h-4" />
               </button>
               {activeDropdown === "type" && (
                 <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                  {["Notes", "Syllabus", "PYQs"].map((opt) => (
+                  {[
+                    { label: "All", value: "all" },
+                    { label: "Notes", value: "notes" },
+                    { label: "PYQs", value: "pyqs" },
+                    { label: "Syllabus", value: "syllabus" },
+                  ].map((opt) => (
                     <div
-                      key={opt}
-                      onClick={() => handleSelect("type", opt)}
+                      key={opt.value}
+                      onClick={() => handleSelect("type", opt.value)}
                       className="px-4 py-2 hover:bg-purple-50 cursor-pointer text-sm text-gray-700"
                     >
-                      {opt}
+                      {opt.label}
                     </div>
                   ))}
                 </div>
@@ -331,6 +436,140 @@ export default function ExplorePage() {
           </div>
         </form>
       </div>
+
+      {/* Search Results Section */}
+      {hasSearched && (
+        <div className="max-w-6xl mx-auto mb-20">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-black">
+              Search Results
+              {results.length > 0 && (
+                <span className="text-purple-600 ml-2">
+                  ({results.length} found)
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={handleClearFilters}
+              className="px-4 py-2 bg-white border-2 border-gray-300 rounded-full font-semibold text-sm hover:bg-gray-50 transition-colors"
+            >
+              Clear Search
+            </button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+              <p className="text-gray-600 font-semibold">
+                Searching resources...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+              <p className="text-red-600 font-semibold">{error}</p>
+              <button
+                onClick={() => handleSearch()}
+                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-12 text-center">
+              <div className="text-6xl mb-4">🔍</div>
+              <h3 className="text-xl font-bold mb-2">No results found</h3>
+              <p className="text-gray-600">
+                Try adjusting your search query or filters
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {results.map((result) => (
+                <div
+                  key={result._id}
+                  className="bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+                >
+                  {/* Resource Type Badge */}
+                  <div className="flex justify-between items-start mb-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold border ${getResourceTypeBadgeColor(
+                        result
+                      )}`}
+                    >
+                      {getResourceTypeLabel(result)}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-lg font-bold mb-3 line-clamp-2">
+                    {result.title}
+                  </h3>
+
+                  {/* Details */}
+                  <div className="space-y-2 mb-4">
+                    {result.program && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-semibold text-gray-500">
+                          Program:
+                        </span>
+                        <span className="text-gray-700">{result.program}</span>
+                      </div>
+                    )}
+                    {result.courseCode && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-semibold text-gray-500">
+                          Code:
+                        </span>
+                        <span className="text-gray-700 font-mono">
+                          {result.courseCode}
+                        </span>
+                      </div>
+                    )}
+                    {result.courseName && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-semibold text-gray-500">
+                          Course:
+                        </span>
+                        <span className="text-gray-700 line-clamp-1">
+                          {result.courseName}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm">
+                      {result.year && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+                          {result.year}
+                        </span>
+                      )}
+                      {result.semester && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+                          {result.semester}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Uploaded By */}
+                  {result.uploadedBy && (
+                    <div className="pt-3 border-t border-gray-200 text-xs text-gray-500">
+                      by{" "}
+                      <span className="font-semibold text-gray-700">
+                        {result.uploadedBy.username}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* View Button */}
+                  <button className="mt-4 w-full py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2">
+                    View Details
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Categories Icons */}
       <div className="max-w-5xl mx-auto mb-20">
