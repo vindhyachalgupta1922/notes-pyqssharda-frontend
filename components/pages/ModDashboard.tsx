@@ -5,12 +5,28 @@ import { useModStore } from "@/stores/mod.store";
 import { toast } from "react-hot-toast";
 import useAuthStore from "@/stores/authStore";
 import DashboardPage from "./DashboardPage";
+import RejectionModal from "@/components/modals/RejectionModal";
 
 type DashboardView = "moderator" | "user";
+
+interface RejectionModalState {
+  isOpen: boolean;
+  itemId: string;
+  itemType: "note" | "pyq" | "syllabus";
+  itemTitle: string;
+}
 
 export default function ModDashboard() {
   const { user } = useAuthStore();
   const [currentView, setCurrentView] = useState<DashboardView>("moderator");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectionModal, setRejectionModal] = useState<RejectionModalState>({
+    isOpen: false,
+    itemId: "",
+    itemType: "note",
+    itemTitle: "",
+  });
+
   const {
     pendingNotes,
     pendingPyqs,
@@ -30,21 +46,62 @@ export default function ModDashboard() {
   const handleAction = async (
     id: string,
     type: "note" | "pyq" | "syllabus",
-    action: "approve" | "reject"
+    action: "approve" | "reject",
+    title?: string
   ) => {
-    try {
-      if (action === "approve") {
+    if (action === "reject") {
+      // Open rejection modal
+      setRejectionModal({
+        isOpen: true,
+        itemId: id,
+        itemType: type,
+        itemTitle: title || "Untitled",
+      });
+    } else {
+      // Handle approval directly
+      try {
         await approveItem(id, type);
         toast.success("Item approved successfully");
-      } else {
-        await rejectItem(id, type);
-        toast.success("Item rejected");
+        await fetchPendingContent();
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to approve item");
+        console.error("Approval error:", error);
       }
-      // Refresh pending content
+    }
+  };
+
+  const handleRejectionSubmit = async (rejectionReason: string) => {
+    setIsSubmitting(true);
+    try {
+      await rejectItem(
+        rejectionModal.itemId,
+        rejectionModal.itemType,
+        rejectionReason
+      );
+      toast.success("Item rejected successfully");
+      setRejectionModal({
+        isOpen: false,
+        itemId: "",
+        itemType: "note",
+        itemTitle: "",
+      });
       await fetchPendingContent();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to process action");
-      console.error("Action error:", error);
+      toast.error(error?.message || "Failed to reject item");
+      console.error("Rejection error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectionModalClose = () => {
+    if (!isSubmitting) {
+      setRejectionModal({
+        isOpen: false,
+        itemId: "",
+        itemType: "note",
+        itemTitle: "",
+      });
     }
   };
 
@@ -122,7 +179,7 @@ export default function ModDashboard() {
             title="Pending PYQs"
             items={pendingPyqs}
             onApprove={(id) => handleAction(id, "pyq", "approve")}
-            onReject={(id) => handleAction(id, "pyq", "reject")}
+            onReject={(id, title) => handleAction(id, "pyq", "reject", title)}
             type="pyq"
             color="#FDBA74"
           />
@@ -132,7 +189,7 @@ export default function ModDashboard() {
             title="Pending Notes"
             items={pendingNotes}
             onApprove={(id) => handleAction(id, "note", "approve")}
-            onReject={(id) => handleAction(id, "note", "reject")}
+            onReject={(id, title) => handleAction(id, "note", "reject", title)}
             type="note"
             color="#86EFAC"
           />
@@ -142,12 +199,24 @@ export default function ModDashboard() {
             title="Pending Syllabus"
             items={pendingSyllabus}
             onApprove={(id) => handleAction(id, "syllabus", "approve")}
-            onReject={(id) => handleAction(id, "syllabus", "reject")}
+            onReject={(id, title) =>
+              handleAction(id, "syllabus", "reject", title)
+            }
             type="syllabus"
             color="#C084FC"
           />
         </div>
       )}
+
+      {/* Rejection Modal */}
+      <RejectionModal
+        isOpen={rejectionModal.isOpen}
+        onClose={handleRejectionModalClose}
+        onSubmit={handleRejectionSubmit}
+        itemType={rejectionModal.itemType}
+        itemTitle={rejectionModal.itemTitle}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }
@@ -237,7 +306,7 @@ function ModSection({
   title: string;
   items: any[];
   onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  onReject: (id: string, title: string) => void;
   type: "note" | "pyq" | "syllabus";
   color: string;
 }) {
@@ -325,7 +394,7 @@ function ModSection({
                     ✓
                   </button>
                   <button
-                    onClick={() => onReject(item._id)}
+                    onClick={() => onReject(item._id, item.title)}
                     className="p-2 bg-red-100 hover:bg-red-200 border border-black rounded-lg transition-colors text-red-700 font-bold text-sm"
                     title="Reject"
                   >

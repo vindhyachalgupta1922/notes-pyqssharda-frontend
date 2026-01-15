@@ -42,7 +42,11 @@ interface ModState {
 
   fetchPendingContent: () => Promise<void>;
   approveItem: (id: string, type: "note" | "pyq" | "syllabus") => Promise<void>;
-  rejectItem: (id: string, type: "note" | "pyq" | "syllabus") => Promise<void>;
+  rejectItem: (
+    id: string,
+    type: "note" | "pyq" | "syllabus",
+    rejectionReason: string
+  ) => Promise<void>;
 }
 
 export const useModStore = create<ModState>((set, get) => ({
@@ -119,14 +123,11 @@ export const useModStore = create<ModState>((set, get) => ({
     }
   },
 
-  rejectItem: async (id, type) => {
+  rejectItem: async (id, type, rejectionReason) => {
     set({ error: null });
     try {
-      // Prompt for rejection reason
-      const rejectionReason = prompt("Please provide a reason for rejection:");
       if (!rejectionReason || rejectionReason.trim() === "") {
-        toast.error("Rejection reason is required");
-        return;
+        throw new Error("Rejection reason is required");
       }
 
       if (type === "note") {
