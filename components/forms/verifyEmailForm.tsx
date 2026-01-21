@@ -91,6 +91,17 @@ const VerifyEmailForm = () => {
           {loading ? "Verifying..." : "Verify Email"}
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            sessionStorage.removeItem("verifyEmail");
+            router.push("/auth/login");
+          }}
+          className="w-full mt-3 bg-white hover:bg-gray-50 text-black font-bold py-3 rounded-lg transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)]"
+        >
+          Skip & Login Directly
+        </button>
+
         <p className="text-xs text-center text-gray-500 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200">
           Check your spam folder if you did not receive the OTP.
         </p>
