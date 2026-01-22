@@ -69,10 +69,12 @@ export default function ModDashboard({
       try {
         await approveItem(id, type);
         toast.success("Item approved successfully");
-        await fetchPendingContent();
+        // No need to refetch - store already updates optimistically
       } catch (error: unknown) {
         toast.error((error as any)?.message || "Failed to approve item");
         console.error("Approval error:", error);
+        // Only refetch on error to restore correct state
+        await fetchPendingContent();
       }
     }
   };
@@ -92,10 +94,12 @@ export default function ModDashboard({
         itemType: "note",
         itemTitle: "",
       });
-      await fetchPendingContent();
+      // No need to refetch - store already updates optimistically
     } catch (error: unknown) {
       toast.error((error as any)?.message || "Failed to reject item");
       console.error("Rejection error:", error);
+      // Only refetch on error to restore correct state
+      await fetchPendingContent();
     } finally {
       setIsSubmitting(false);
     }
