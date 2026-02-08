@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import NotesForm from "@/components/forms/Notes";
 import PyqsForm from "@/components/forms/pyqs";
 import SyllabusForm from "@/components/forms/Syllabus";
+import FileViewerModal from "@/components/FileViewerModal";
 import { toast } from "react-hot-toast";
 import useAuthStore from "@/stores/authStore";
 import { useNotesStore } from "@/stores/notes.store";
@@ -41,6 +42,10 @@ export default function DashboardPage({
     "note" | "pyq" | "syllabus" | null
   >(null);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
 
   const fetchData = async () => {
     await Promise.all([fetchMyNotes(), fetchPYQs(), fetchSyllabus()]);
@@ -146,6 +151,7 @@ export default function DashboardPage({
             onAdd={() => openModal("pyq")}
             onEdit={(item) => openModal("pyq", item)}
             onDelete={(id) => handleDelete("pyq", id)}
+            onViewFile={(url, name) => setSelectedFile({ url, name })}
             type="pyq"
             color="#FF9F66"
           />
@@ -157,6 +163,7 @@ export default function DashboardPage({
             onAdd={() => openModal("note")}
             onEdit={(item) => openModal("note", item)}
             onDelete={(id) => handleDelete("note", id)}
+            onViewFile={(url, name) => setSelectedFile({ url, name })}
             type="note"
             color="#4ADE80"
           />
@@ -168,6 +175,7 @@ export default function DashboardPage({
             onAdd={() => openModal("syllabus")}
             onEdit={(item) => openModal("syllabus", item)}
             onDelete={(id) => handleDelete("syllabus", id)}
+            onViewFile={(url, name) => setSelectedFile({ url, name })}
             type="syllabus"
             color="#C084FC"
           />
@@ -208,6 +216,16 @@ export default function DashboardPage({
           </div>
         </div>
       )}
+
+      {/* File Viewer Modal */}
+      {selectedFile && (
+        <FileViewerModal
+          isOpen={!!selectedFile}
+          onClose={() => setSelectedFile(null)}
+          fileUrl={selectedFile.url}
+          fileName={selectedFile.name}
+        />
+      )}
     </div>
   );
 }
@@ -239,6 +257,7 @@ function Section({
   onAdd,
   onEdit,
   onDelete,
+  onViewFile,
   type,
   color,
 }: {
@@ -247,6 +266,7 @@ function Section({
   onAdd: () => void;
   onEdit: (item: any) => void;
   onDelete: (id: string) => void;
+  onViewFile: (url: string, name: string) => void;
   type: "note" | "pyq" | "syllabus";
   color: string;
 }) {
@@ -343,13 +363,12 @@ function Section({
                   {item.program} • Sem {item.semester}{" "}
                   {type === "pyq" && `• ${item.year}`}
                 </div>
-                <a
-                  href={item.fileUrl}
-                  target="_blank"
-                  className="text-xs font-black underline decoration-2 hover:text-purple-600 transition-colors text-black"
+                <button
+                  onClick={() => onViewFile(item.fileUrl, item.title)}
+                  className="text-xs font-black underline decoration-2 hover:text-purple-600 transition-colors text-black cursor-pointer"
                 >
                   VIEW FILE →
-                </a>
+                </button>
               </div>
             </div>
           ))

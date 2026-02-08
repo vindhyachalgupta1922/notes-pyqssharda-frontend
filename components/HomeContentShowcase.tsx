@@ -6,6 +6,7 @@ import useAuthStore from "@/stores/authStore";
 import { getAllNotes } from "@/lib/api/notes.api";
 import { getAllPyqs } from "@/lib/api/pyqs.api";
 import { getAllSyllabus } from "@/lib/api/syllabus.api";
+import FileViewerModal from "./FileViewerModal";
 
 interface ContentItem {
   _id: string;
@@ -26,6 +27,10 @@ export default function HomeContentShowcase() {
   const [pyqs, setPyqs] = useState<ContentItem[]>([]);
   const [syllabus, setSyllabus] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchContent();
@@ -116,7 +121,7 @@ export default function HomeContentShowcase() {
             >
               <div className="mb-3">
                 <h3
-                  className="font-bold text-base text-black line-clamp-2 mb-2"
+                  className="font-bold text-base text-black mb-2"
                   title={item.title}
                 >
                   {item.title}
@@ -137,14 +142,17 @@ export default function HomeContentShowcase() {
                   {item.program} • Sem {item.semester}
                   {item.year && ` • ${item.year}`}
                 </div>
-                <a
-                  href={item.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-black underline decoration-2 hover:text-blue-600 transition-colors text-black"
+                <button
+                  onClick={() =>
+                    setSelectedFile({
+                      url: item.fileUrl,
+                      name: item.title,
+                    })
+                  }
+                  className="text-xs font-black underline decoration-2 hover:text-blue-600 transition-colors text-black cursor-pointer"
                 >
                   VIEW FILE →
-                </a>
+                </button>
               </div>
             </div>
           ))}
@@ -161,15 +169,27 @@ export default function HomeContentShowcase() {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-12">
-      <h2 className="text-4xl font-black text-center mb-8 text-black">
-        Recent Approved Content
-      </h2>
-      <div className="flex flex-col md:flex-row gap-6">
-        <ContentCard title="Notes" items={notes} type="notes" />
-        <ContentCard title="PYQs" items={pyqs} type="pyqs" />
-        <ContentCard title="Syllabus" items={syllabus} type="syllabus" />
+    <>
+      <div className="w-full max-w-7xl mx-auto px-4 py-12">
+        <h2 className="text-4xl font-black text-center mb-8 text-black">
+          Recent Approved Content
+        </h2>
+        <div className="flex flex-col md:flex-row gap-6">
+          <ContentCard title="Notes" items={notes} type="notes" />
+          <ContentCard title="PYQs" items={pyqs} type="pyqs" />
+          <ContentCard title="Syllabus" items={syllabus} type="syllabus" />
+        </div>
       </div>
-    </div>
+
+      {/* File Viewer Modal */}
+      {selectedFile && (
+        <FileViewerModal
+          isOpen={!!selectedFile}
+          onClose={() => setSelectedFile(null)}
+          fileUrl={selectedFile.url}
+          fileName={selectedFile.name}
+        />
+      )}
+    </>
   );
 }
