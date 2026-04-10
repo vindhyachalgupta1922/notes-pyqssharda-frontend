@@ -40,4 +40,12 @@ const PYQ2_DATA_2024_25 = [
     year: "2024-25",
     src:"../../../public/PYQs/BtechCS/2ndsem/MTH 145 PROBABILITY AND STATISTICS 2024-25.pdf"
   },
+      {
+    subject: "Human Value and Ethics",
+    code: "HMM 111",
+    credits: 4,
+    semester: 4,
+    year: "2024-25",
+    src:"../../../public/PYQs/BtechCS/2ndsem/HMM 111 HUMAN VALUE AND ETHICS 2024-25.pdf"
+  },
 ];
